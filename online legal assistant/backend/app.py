@@ -1,9 +1,7 @@
-
 import sqlite3
 import re
 from datetime import datetime
 import os
-print("GROQ KEY:", os.getenv("GROQ_API_KEY"))
 
 from flask import session, Flask, request, jsonify, render_template, send_file
 from flask_cors import CORS
@@ -14,16 +12,19 @@ from groq import Groq
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
-# 🔑 GROQ CLIENT
-if not os.getenv("GROQ_API_KEY"):
+# 🔑 GROQ CLIENT (SAFE HANDLING)
+api_key = os.getenv("GROQ_API_KEY")
+
+if not api_key:
     print("⚠️ GROQ API KEY NOT FOUND")
+    client = None
+else:
+    client = Groq(api_key=api_key)
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-# 🚀 FLASK APP
+# 🚀 FLASK APP (FIXED PATH)
 app = Flask(__name__,
-            template_folder="../frontend",
-            static_folder="../frontend")
+            template_folder="frontend",
+            static_folder="frontend")
 
 app.secret_key = "super_secret_key"
 CORS(app, supports_credentials=True)
@@ -34,17 +35,20 @@ LEGAL_FAQ = {
     "cyber crime": "Report at cybercrime.gov.in or call 1930.",
     "lost mobile": "Block IMEI at ceir.gov.in.",
     "domestic violence": "Call 1091 or file complaint.",
-
 }
+
 # 🔥 CLEAN TEXT
 def clean_text(text):
     return re.sub(r'[^a-z\s]', '', text.lower())
 
 # 🤖 ANSWER FUNCTION
 def get_answer(query):
+
+    if client is None:
+        return "AI service not configured"
+
     q = clean_text(query)
 
-    # Only trigger FAQ if very short query
     if len(q.split()) <= 2:
         best_match = process.extractOne(q, LEGAL_FAQ.keys())
         if best_match:
@@ -52,27 +56,21 @@ def get_answer(query):
             if score > 90:
                 return LEGAL_FAQ[key]
 
-    # Otherwise use AI
     try:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are a professional Indian legal assistant. Give detailed and helpful legal guidance."
-                },
-                {
-                    "role": "user",
-                    "content": query
-                }
+                {"role": "system",
+                 "content": "You are a professional Indian legal assistant. Give detailed and helpful legal guidance."},
+                {"role": "user", "content": query}
             ]
         )
-
         return response.choices[0].message.content
 
     except Exception as e:
         print("GROQ ERROR:", e)
         return "Error"
+
 # 🔐 REGISTER
 @app.route("/api/register", methods=["POST"])
 def register():
@@ -227,7 +225,24 @@ def init_db():
     conn.close()
 
 # 🚀 RUN
-import os
-
 if __name__ == "__main__":
+    init_db()   # ✅ VERY IMPORTANT
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
+
+
+
+            
+  
+               
+
+   
+
+   
+  
+ 
+   
+
+ 
+
+       
