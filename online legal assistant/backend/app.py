@@ -23,8 +23,8 @@ else:
 
 # 🚀 FLASK APP (FIXED PATH)
 app = Flask(__name__,
-            template_folder="frontend",
-            static_folder="frontend")
+            template_folder="../frontend",
+            static_folder="../frontend")
 
 app.secret_key = "super_secret_key"
 CORS(app, supports_credentials=True)
@@ -229,17 +229,6 @@ if __name__ == "__main__":
     init_db()   # ✅ VERY IMPORTANT
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
-
-
-
-            
-  
-               
-
-   
-
-   
-  
  
    
 
