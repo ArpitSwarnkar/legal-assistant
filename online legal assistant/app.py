@@ -1,0 +1,186 @@
+import sqlite3
+import re
+from datetime import datetime
+import os
+
+from flask import session, Flask, request, jsonify, render_template, send_file
+from flask_cors import CORS
+from rapidfuzz import process
+from groq import Groq
+
+# 📄 PDF
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+
+# 🔑 GROQ CLIENT
+api_key = os.getenv("GROQ_API_KEY")
+
+if not api_key:
+    print("⚠️ GROQ API KEY NOT FOUND")
+    client = None
+else:
+    client = Groq(api_key=api_key)
+
+# 🚀 FLASK APP
+app = Flask(__name__)
+app.config['SESSION_COOKIE_SAMESITE'] = "None"
+app.config['SESSION_COOKIE_SECURE'] = True
+
+app.secret_key = "super_secret_key"
+CORS(app, supports_credentials=True, origins=["https://legal-assistant-nmki.onrender.com"])
+
+# 🔥 FAQ
+LEGAL_FAQ = {
+    "fir": "You can file FIR under Section 154 CrPC.",
+    "cyber crime": "Report at cybercrime.gov.in or call 1930.",
+    "lost mobile": "Block IMEI at ceir.gov.in.",
+    "domestic violence": "Call 1091 or file complaint.",
+}
+
+# 🔥 CLEAN TEXT
+def clean_text(text):
+    return re.sub(r'[^a-z\s]', '', text.lower())
+
+# 🤖 ANSWER FUNCTION
+def get_answer(query):
+    if client is None:
+        return "AI service not configured"
+
+    q = clean_text(query)
+
+    if len(q.split()) <= 2:
+        best_match = process.extractOne(q, LEGAL_FAQ.keys())
+        if best_match:
+            key, score, _ = best_match
+            if score > 90:
+                return LEGAL_FAQ[key]
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system",
+                 "content": "You are a professional Indian legal assistant."},
+                {"role": "user", "content": query}
+            ]
+        )
+        return response.choices[0].message.content
+
+    except Exception as e:
+        print("GROQ ERROR:", e)
+        return "Error"
+
+# 🗄️ DB INIT (DEFINE FIRST)
+def init_db():
+    conn = sqlite3.connect("legal_assistant.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE,
+        password TEXT)""")
+
+    cursor.execute("""CREATE TABLE IF NOT EXISTS chats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        message TEXT,
+        sender TEXT,
+        created_at TEXT)""")
+
+    conn.commit()
+    conn.close()
+
+# 🔐 REGISTER
+@app.route("/api/register", methods=["POST"])
+def register():
+    try:
+        data = request.get_json()
+        print("REGISTER DATA:", data)
+
+        if not data:
+            return jsonify({"error": "No data received"}), 400
+
+        email = data.get("email")
+        password = data.get("password")
+
+        conn = sqlite3.connect("legal_assistant.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO users (email, password) VALUES (?, ?)",
+            (email, password)
+        )
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Registered"})
+
+    except Exception as e:
+        print("REGISTER ERROR:", e)
+        return jsonify({"error": str(e)}), 400
+# 🔐 LOGIN
+@app.route("/api/login", methods=["POST"])
+def login():
+    try:
+        data = request.get_json()
+
+        # 🔍 Debug print (check terminal)
+        print("LOGIN DATA:", data)
+
+        if not data:
+            return jsonify({"error": "No data received"}), 400
+
+        email = data.get("email")
+        password = data.get("password")
+
+        if not email or not password:
+            return jsonify({"error": "Missing email or password"}), 400
+
+        conn = sqlite3.connect("legal_assistant.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM users WHERE email=? AND password=?",
+            (email, password)
+        )
+
+        user = cursor.fetchone()
+        conn.close()
+
+        if user:
+            session["user_id"] = user[0]
+            return jsonify({"message": "Login success"})
+        else:
+            return jsonify({"error": "Invalid credentials"}), 401
+
+    except Exception as e:
+        print("LOGIN ERROR:", e)   # 🔥 IMPORTANT
+        return jsonify({"error": str(e)}), 500
+
+# 💬 ASK
+@app.route("/api/ask", methods=["POST"])
+def ask():
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.json
+    answer = get_answer(data["question"])
+
+    return jsonify({"answer": answer})
+
+# 🌐 PAGES
+@app.route("/")
+def login_page():
+    return render_template("index.html")
+@app.route("/register")
+def register_page():
+    return render_template("register.html")
+@app.route("/home")
+def home():
+    return render_template("home.html")
+
+
+# 🚀 RUN (CALL HERE ONLY)
+if __name__ == "__main__":
+    init_db()   # ✅ correct place
+    app.run(host="0.0.0.0", port=10000, debug=True)
