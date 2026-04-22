@@ -12,7 +12,7 @@ from groq import Groq
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
-# 🔑 GROQ CLIENT (SAFE HANDLING)
+# 🔑 GROQ CLIENT
 api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
@@ -21,13 +21,16 @@ if not api_key:
 else:
     client = Groq(api_key=api_key)
 
-# 🚀 FLASK APP (FIXED PATH)
+# 🚀 FLASK APP
 app = Flask(__name__,
+        
             template_folder="../frontend",
             static_folder="../frontend")
+app.config['SESSION_COOKIE_SAMESITE'] = "None"
+app.config['SESSION_COOKIE_SECURE'] = True
 
 app.secret_key = "super_secret_key"
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=["https://your-frontend.onrender.com"])
 
 # 🔥 FAQ
 LEGAL_FAQ = {
@@ -43,7 +46,6 @@ def clean_text(text):
 
 # 🤖 ANSWER FUNCTION
 def get_answer(query):
-
     if client is None:
         return "AI service not configured"
 
@@ -61,7 +63,7 @@ def get_answer(query):
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system",
-                 "content": "You are a professional Indian legal assistant. Give detailed and helpful legal guidance."},
+                 "content": "You are a professional Indian legal assistant."},
                 {"role": "user", "content": query}
             ]
         )
@@ -71,140 +73,7 @@ def get_answer(query):
         print("GROQ ERROR:", e)
         return "Error"
 
-# 🔐 REGISTER
-@app.route("/api/register", methods=["POST"])
-def register():
-    data = request.json
-    conn = sqlite3.connect("legal_assistant.db")
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(
-            "INSERT INTO users (email, password) VALUES (?, ?)",
-            (data["email"], data["password"])
-        )
-        conn.commit()
-        return jsonify({"message": "Registered"})
-    except:
-        return jsonify({"error": "Email exists"}), 400
-    finally:
-        conn.close()
-
-# 🔐 LOGIN
-@app.route("/api/login", methods=["POST"])
-def login():
-    data = request.json
-    conn = sqlite3.connect("legal_assistant.db")
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT id FROM users WHERE email=? AND password=?",
-        (data["email"], data["password"])
-    )
-
-    user = cursor.fetchone()
-    conn.close()
-
-    if user:
-        session["user_id"] = user[0]
-        return jsonify({"message": "Login success"})
-    return jsonify({"error": "Invalid"}), 401
-
-# 💬 ASK
-@app.route("/api/ask", methods=["POST"])
-def ask():
-    if "user_id" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.json
-    question = data["question"]
-    user_id = session["user_id"]
-
-    answer = get_answer(question)
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    conn = sqlite3.connect("legal_assistant.db")
-    cursor = conn.cursor()
-
-    cursor.execute("INSERT INTO chats VALUES (NULL,?,?,?,?)",
-                   (user_id, question, "user", now))
-
-    cursor.execute("INSERT INTO chats VALUES (NULL,?,?,?,?)",
-                   (user_id, answer, "bot", now))
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({"answer": answer})
-
-# 📜 HISTORY
-@app.route("/api/history")
-def history():
-    if "user_id" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    conn = sqlite3.connect("legal_assistant.db")
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT message, sender, created_at FROM chats WHERE user_id=?",
-        (session["user_id"],)
-    )
-
-    chats = cursor.fetchall()
-    conn.close()
-
-    return jsonify({"chats": chats})
-
-# 📄 EXPORT PDF
-@app.route("/api/export-pdf")
-def export_pdf():
-    if "user_id" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    user_id = session["user_id"]
-
-    conn = sqlite3.connect("legal_assistant.db")
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT message, sender, created_at FROM chats WHERE user_id=?",
-        (user_id,)
-    )
-
-    chats = cursor.fetchall()
-    conn.close()
-
-    file_path = f"chat_{user_id}.pdf"
-
-    doc = SimpleDocTemplate(file_path)
-    styles = getSampleStyleSheet()
-    content = []
-
-    for msg, sender, time in chats:
-        content.append(Paragraph(f"{sender} ({time}): {msg}", styles["Normal"]))
-        content.append(Spacer(1, 10))
-
-    doc.build(content)
-
-    return send_file(file_path, as_attachment=True)
-
-# 🌐 PAGES
-@app.route("/")
-def login_page():
-    return render_template("index.html")
-
-@app.route("/home")
-def home():
-    return render_template("home.html")
-
-# 🔓 LOGOUT
-@app.route("/api/logout")
-def logout():
-    session.clear()
-    return jsonify({"message": "Logged out"})
-
-# 🗄️ DB INIT
+# 🗄️ DB INIT (DEFINE FIRST)
 def init_db():
     conn = sqlite3.connect("legal_assistant.db")
     cursor = conn.cursor()
@@ -224,11 +93,97 @@ def init_db():
     conn.commit()
     conn.close()
 
-# 🚀 RUN
-if __name__ == "__main__":
-    init_db()   # ✅ VERY IMPORTANT
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+# 🔐 REGISTER
+@app.route("/api/register", methods=["POST"])
+def register():
+    try:
+        data = request.get_json()
+        print("REGISTER DATA:", data)
 
+        if not data:
+            return jsonify({"error": "No data received"}), 400
+
+        email = data.get("email")
+        password = data.get("password")
+
+        conn = sqlite3.connect("legal_assistant.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO users (email, password) VALUES (?, ?)",
+            (email, password)
+        )
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Registered"})
+
+    except Exception as e:
+        print("REGISTER ERROR:", e)
+        return jsonify({"error": str(e)}), 400
+# 🔐 LOGIN
+@app.route("/api/login", methods=["POST"])
+def login():
+    try:
+        data = request.get_json()
+
+        # 🔍 Debug print (check terminal)
+        print("LOGIN DATA:", data)
+
+        if not data:
+            return jsonify({"error": "No data received"}), 400
+
+        email = data.get("email")
+        password = data.get("password")
+
+        if not email or not password:
+            return jsonify({"error": "Missing email or password"}), 400
+
+        conn = sqlite3.connect("legal_assistant.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM users WHERE email=? AND password=?",
+            (email, password)
+        )
+
+        user = cursor.fetchone()
+        conn.close()
+
+        if user:
+            session["user_id"] = user[0]
+            return jsonify({"message": "Login success"})
+        else:
+            return jsonify({"error": "Invalid credentials"}), 401
+
+    except Exception as e:
+        print("LOGIN ERROR:", e)   # 🔥 IMPORTANT
+        return jsonify({"error": str(e)}), 500
+
+# 💬 ASK
+@app.route("/api/ask", methods=["POST"])
+def ask():
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.json
+    answer = get_answer(data["question"])
+
+    return jsonify({"answer": answer})
+
+# 🌐 PAGES
+@app.route("/")
+def login_page():
+    return render_template("index.html")
+
+@app.route("/home")
+def home():
+    return render_template("home.html")
+
+# 🚀 RUN (CALL HERE ONLY)
+if __name__ == "__main__":
+    init_db()   # ✅ correct place
+    app.run(host="0.0.0.0", port=10000, debug=True)
  
    
 
