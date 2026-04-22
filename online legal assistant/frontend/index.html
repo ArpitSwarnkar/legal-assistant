@@ -1,189 +1,237 @@
-import sqlite3
-import re
-from datetime import datetime
-import os
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legal Assistant</title>
 
-from flask import session, Flask, request, jsonify, render_template, send_file
-from flask_cors import CORS
-from rapidfuzz import process
-from groq import Groq
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
-# 📄 PDF
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-
-# 🔑 GROQ CLIENT
-api_key = os.getenv("GROQ_API_KEY")
-
-if not api_key:
-    print("⚠️ GROQ API KEY NOT FOUND")
-    client = None
-else:
-    client = Groq(api_key=api_key)
-
-# 🚀 FLASK APP
-app = Flask(__name__,
-        
-            template_folder="../frontend",
-            static_folder="../frontend")
-app.config['SESSION_COOKIE_SAMESITE'] = "None"
-app.config['SESSION_COOKIE_SECURE'] = True
-
-app.secret_key = "super_secret_key"
-CORS(app, supports_credentials=True, origins=["https://your-frontend.onrender.com"])
-
-# 🔥 FAQ
-LEGAL_FAQ = {
-    "fir": "You can file FIR under Section 154 CrPC.",
-    "cyber crime": "Report at cybercrime.gov.in or call 1930.",
-    "lost mobile": "Block IMEI at ceir.gov.in.",
-    "domestic violence": "Call 1091 or file complaint.",
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Poppins", sans-serif;
 }
 
-# 🔥 CLEAN TEXT
-def clean_text(text):
-    return re.sub(r'[^a-z\s]', '', text.lower())
+body {
+    height: 100vh;
+    display: flex;
+}
 
-# 🤖 ANSWER FUNCTION
-def get_answer(query):
-    if client is None:
-        return "AI service not configured"
+/* LEFT SIDE */
+.left {
+    width: 50%;
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+    color: white;
 
-    q = clean_text(query)
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 
-    if len(q.split()) <= 2:
-        best_match = process.extractOne(q, LEGAL_FAQ.keys())
-        if best_match:
-            key, score, _ = best_match
-            if score > 90:
-                return LEGAL_FAQ[key]
+    text-align: center;
+    padding: 60px;
+}
 
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system",
-                 "content": "You are a professional Indian legal assistant."},
-                {"role": "user", "content": query}
-            ]
-        )
-        return response.choices[0].message.content
+/* DROP TEXT */
+.drop-text {
+    font-size: 52px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 2px;
+}
 
-    except Exception as e:
-        print("GROQ ERROR:", e)
-        return "Error"
+.drop-text span {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(-50px);
+    animation: drop 0.5s forwards;
+}
 
-# 🗄️ DB INIT (DEFINE FIRST)
-def init_db():
-    conn = sqlite3.connect("legal_assistant.db")
-    cursor = conn.cursor()
+/* delays */
+.drop-text span:nth-child(1) { animation-delay: 0.1s; }
+.drop-text span:nth-child(2) { animation-delay: 0.2s; }
+.drop-text span:nth-child(3) { animation-delay: 0.3s; }
+.drop-text span:nth-child(4) { animation-delay: 0.4s; }
+.drop-text span:nth-child(5) { animation-delay: 0.5s; }
 
-    cursor.execute("""CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE,
-        password TEXT)""")
+.drop-text span:nth-child(7) { animation-delay: 0.6s; }
+.drop-text span:nth-child(8) { animation-delay: 0.7s; }
+.drop-text span:nth-child(9) { animation-delay: 0.8s; }
+.drop-text span:nth-child(10) { animation-delay: 0.9s; }
+.drop-text span:nth-child(11) { animation-delay: 1s; }
+.drop-text span:nth-child(12) { animation-delay: 1.1s; }
+.drop-text span:nth-child(13) { animation-delay: 1.2s; }
+.drop-text span:nth-child(14) { animation-delay: 1.3s; }
+.drop-text span:nth-child(15) { animation-delay: 1.4s; }
 
-    cursor.execute("""CREATE TABLE IF NOT EXISTS chats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        message TEXT,
-        sender TEXT,
-        created_at TEXT)""")
+@keyframes drop {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 
-    conn.commit()
-    conn.close()
+/* TEXT */
+.left p {
+    margin-top: 20px;
+    font-size: 18px;
+    opacity: 0.9;
+    max-width: 420px;
+}
 
-# 🔐 REGISTER
-@app.route("/api/register", methods=["POST"])
-def register():
-    try:
-        data = request.get_json()
-        print("REGISTER DATA:", data)
+/* RIGHT SIDE */
+.right {
+    width: 50%;
+    background: #0f172a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
-        if not data:
-            return jsonify({"error": "No data received"}), 400
+/* LOGIN CARD */
+.card {
+    width: 350px;
+    padding: 30px;
+    border-radius: 12px;
+    background: #1e293b;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+}
 
-        email = data.get("email")
-        password = data.get("password")
+.card h2 {
+    color: white;
+    text-align: center;
+    margin-bottom: 20px;
+}
 
-        conn = sqlite3.connect("legal_assistant.db")
-        cursor = conn.cursor()
+/* INPUT */
+.input-box {
+    margin-bottom: 15px;
+}
 
-        cursor.execute(
-            "INSERT INTO users (email, password) VALUES (?, ?)",
-            (email, password)
-        )
-        conn.commit()
-        conn.close()
+.input-box input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: #334155;
+    color: white;
+}
 
-        return jsonify({"message": "Registered"})
+/* BUTTON */
+.btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
 
-    except Exception as e:
-        print("REGISTER ERROR:", e)
-        return jsonify({"error": str(e)}), 400
-# 🔐 LOGIN
-@app.route("/api/login", methods=["POST"])
-def login():
-    try:
-        data = request.get_json()
+/* ERROR */
+.error {
+    color: #ff6b6b;
+    text-align: center;
+    margin-top: 10px;
+}
 
-        # 🔍 Debug print (check terminal)
-        print("LOGIN DATA:", data)
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .left {
+        display: none;
+    }
+    .right {
+        width: 100%;
+    }
+}
+</style>
+</head>
 
-        if not data:
-            return jsonify({"error": "No data received"}), 400
+<body>
 
-        email = data.get("email")
-        password = data.get("password")
+<!-- LEFT -->
+<div class="left">
+    <h1 class="drop-text">
+        <span>⚖️</span>
+        <span>L</span>
+        <span>e</span>
+        <span>g</span>
+        <span>a</span>
+        <span>l</span>
+        <br>
+        <span>A</span>
+        <span>s</span>
+        <span>s</span>
+        <span>i</span>
+        <span>s</span>
+        <span>t</span>
+        <span>a</span>
+        <span>n</span>
+        <span>t</span>
+    </h1>
 
-        if not email or not password:
-            return jsonify({"error": "Missing email or password"}), 400
+    <p>
+        AI-powered legal assistant for instant help, documents, and guidance.
+    </p>
+</div>
 
-        conn = sqlite3.connect("legal_assistant.db")
-        cursor = conn.cursor()
+<!-- RIGHT (LOGIN) -->
+<div class="right">
+    <div class="card">
+        <h2>Login</h2>
 
-        cursor.execute(
-            "SELECT id FROM users WHERE email=? AND password=?",
-            (email, password)
-        )
+        <div class="input-box">
+            <input id="email" type="email" placeholder="Email">
+        </div>
 
-        user = cursor.fetchone()
-        conn.close()
+        <div class="input-box">
+            <input id="password" type="password" placeholder="Password">
+        </div>
 
-        if user:
-            session["user_id"] = user[0]
-            return jsonify({"message": "Login success"})
-        else:
-            return jsonify({"error": "Invalid credentials"}), 401
+        <button class="btn" onclick="login()">Login</button>
 
-    except Exception as e:
-        print("LOGIN ERROR:", e)   # 🔥 IMPORTANT
-        return jsonify({"error": str(e)}), 500
+        <div class="error" id="errorMsg"></div>
+    </div>
+</div>
 
-# 💬 ASK
-@app.route("/api/ask", methods=["POST"])
-def ask():
-    if "user_id" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
+<script>
+async function login() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const errorMsg = document.getElementById("errorMsg");
 
-    data = request.json
-    answer = get_answer(data["question"])
+    errorMsg.innerText = "";
 
-    return jsonify({"answer": answer})
+    if (!email || !password) {
+        errorMsg.innerText = "Fill all fields";
+        return;
+    }
 
-# 🌐 PAGES
-@app.route("/")
-def login_page():
-    return render_template("index.html")
+    try {
+        let res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+        });
 
-@app.route("/home")
-def home():
-    return render_template("home.html")
+        let data = await res.json();
 
-# 🚀 RUN (CALL HERE ONLY)
-if __name__ == "__main__":
-    init_db()   # ✅ correct place
-    app.run(host="0.0.0.0", port=10000, debug=True)
+        if (res.ok) {
+            window.location.href = "/home";
+        } else {
+            errorMsg.innerText = data.error || "Login failed";
+        }
 
+    } catch {
+        errorMsg.innerText = "Server error";
+    }
+}
+</script>
 
-
+</body>
+</html>
+```
