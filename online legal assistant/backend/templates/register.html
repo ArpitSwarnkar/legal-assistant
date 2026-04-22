@@ -1,0 +1,189 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register | Legal Assistant</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Poppins", sans-serif;
+}
+
+body {
+    height: 100vh;
+    display: flex;
+}
+
+/* LEFT SIDE */
+.left {
+    width: 50%;
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+    color: white;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+}
+
+.left h1 {
+    font-size: 42px;
+}
+
+/* RIGHT SIDE */
+.right {
+    width: 50%;
+    background: #0f172a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* CARD */
+.card {
+    width: 380px;
+    padding: 30px;
+    border-radius: 12px;
+    background: #1e293b;
+}
+
+.card h2 {
+    color: white;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* INPUT */
+.input-box {
+    margin-bottom: 15px;
+}
+
+.input-box input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: #334155;
+    color: white;
+}
+
+/* BUTTON */
+.btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+}
+
+/* FOOTER */
+.footer {
+    text-align: center;
+    margin-top: 15px;
+    color: #aaa;
+}
+
+.footer a {
+    color: #8b5cf6;
+}
+
+/* ERROR */
+.error {
+    color: #ff6b6b;
+    text-align: center;
+    margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="left">
+    <h1>⚖️ Legal Assistant</h1>
+</div>
+
+<div class="right">
+    <div class="card">
+        <h2>Create Account</h2>
+
+        <div class="input-box">
+            <input id="name" type="text" placeholder="Full Name">
+        </div>
+
+        <div class="input-box">
+            <input id="email" type="email" placeholder="Email">
+        </div>
+
+        <div class="input-box">
+            <input id="password" type="password" placeholder="Password">
+        </div>
+
+        <div class="input-box">
+            <input id="confirm" type="password" placeholder="Confirm Password">
+        </div>
+
+        <button class="btn" onclick="register()">Register</button>
+
+        <div class="error" id="errorMsg"></div>
+
+        <div class="footer">
+            Already have an account? <a href="/">Login</a>
+        </div>
+    </div>
+</div>
+
+<script>
+async function register() {
+    const name = document.getElementById("name").value;
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const confirm = document.getElementById("confirm").value;
+    const errorMsg = document.getElementById("errorMsg");
+
+    errorMsg.innerText = "";
+
+    if (!name || !email || !password || !confirm) {
+        errorMsg.innerText = "Fill all fields";
+        return;
+    }
+
+    if (password !== confirm) {
+        errorMsg.innerText = "Passwords do not match";
+        return;
+    }
+
+    try {
+        let res = await fetch("/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password })
+        });
+
+        let data = await res.json();
+
+        if (res.ok) {
+            alert("Account created! Please login.");
+            window.location.href = "/";
+        } else {
+            errorMsg.innerText = data.error || "Registration failed";
+        }
+
+    } catch {
+        errorMsg.innerText = "Server error";
+    }
+}
+</script>
+
+</body>
+</html>
+
