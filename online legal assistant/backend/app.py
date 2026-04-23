@@ -8,14 +8,9 @@ from flask_cors import CORS
 from rapidfuzz import process
 from groq import Groq
 
-# 📄 PDF
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-
 # 🚀 FLASK APP
 app = Flask(__name__)
 
-# 🔐 SESSION CONFIG (Render friendly)
 app.config['SESSION_COOKIE_SAMESITE'] = "None"
 app.config['SESSION_COOKIE_SECURE'] = True
 app.secret_key = "super_secret_key"
@@ -23,12 +18,6 @@ app.secret_key = "super_secret_key"
 CORS(app, supports_credentials=True, origins=[
     "https://legal-assistant-nmki.onrender.com"
 ])
-
-# 🔑 GROQ CLIENT
-api_key = os.getenv("GROQ_API_KEY")
-print("API KEY STATUS:", "FOUND ✅" if api_key else "MISSING ❌")
-
-client = Groq(api_key=api_key) if api_key else None
 
 # 🔥 FAQ
 LEGAL_FAQ = {
@@ -62,13 +51,17 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ✅ IMPORTANT: always run
 init_db()
 
-# 🤖 AI FUNCTION
+# 🤖 AI FUNCTION (FIXED)
 def get_answer(query):
-    if client is None:
+    api_key = os.getenv("GROQ_API_KEY")
+
+    if not api_key:
+        print("❌ API KEY MISSING ON RENDER")
         return "❌ AI service not configured. Add GROQ_API_KEY in Render."
+
+    client = Groq(api_key=api_key)
 
     q = clean_text(query)
 
@@ -85,8 +78,7 @@ def get_answer(query):
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system",
-                 "content": "You are a professional Indian legal assistant."},
+                {"role": "system", "content": "You are a professional Indian legal assistant."},
                 {"role": "user", "content": query}
             ]
         )
@@ -100,15 +92,14 @@ def get_answer(query):
             response = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[
-                    {"role": "system",
-                     "content": "You are a professional Indian legal assistant."},
+                    {"role": "system", "content": "You are a professional Indian legal assistant."},
                     {"role": "user", "content": query}
                 ]
             )
             return response.choices[0].message.content
 
         except Exception as e2:
-            print("Fallback model failed:", e2)
+            print("Fallback failed:", e2)
             return f"❌ GROQ ERROR: {str(e2)}"
 
 # 🔐 REGISTER
@@ -116,9 +107,6 @@ def get_answer(query):
 def register():
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data received"}), 400
-
         email = data.get("email")
         password = data.get("password")
 
@@ -135,7 +123,6 @@ def register():
         return jsonify({"message": "Registered"})
 
     except Exception as e:
-        print("REGISTER ERROR:", e)
         return jsonify({"error": str(e)}), 400
 
 # 🔐 LOGIN
@@ -143,9 +130,6 @@ def register():
 def login():
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data received"}), 400
-
         email = data.get("email")
         password = data.get("password")
 
@@ -167,28 +151,19 @@ def login():
             return jsonify({"error": "Invalid credentials"}), 401
 
     except Exception as e:
-        print("LOGIN ERROR:", e)
         return jsonify({"error": str(e)}), 500
 
 # 💬 ASK
 @app.route("/api/ask", methods=["POST"])
 def ask():
-    try:
-        if "user_id" not in session:
-            return jsonify({"error": "Unauthorized"}), 401
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
 
-        data = request.json
-        question = data.get("question")
+    data = request.json
+    question = data.get("question")
 
-        if not question:
-            return jsonify({"error": "No question provided"}), 400
-
-        answer = get_answer(question)
-        return jsonify({"answer": answer})
-
-    except Exception as e:
-        print("ASK ERROR:", e)
-        return jsonify({"error": str(e)}), 500
+    answer = get_answer(question)
+    return jsonify({"answer": answer})
 
 # 🌐 PAGES
 @app.route("/")
@@ -205,4 +180,4 @@ def home():
 
 # 🚀 RUN
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000, debug=True)
+    app.run(host="0.0.0.0", port=10000)
